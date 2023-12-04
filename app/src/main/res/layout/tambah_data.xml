@@ -10,11 +10,10 @@
     tools:context=".TambahData">
 
     <EditText
-        android:id="@+id/edt_nominal"
+        android:id="@+id/edt_nama"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:inputType="phone"
-        android:hint="Nominal"/>
+        android:hint="Nama Pengirim"/>
     <EditText
         android:id="@+id/edt_desc"
         android:layout_width="match_parent"

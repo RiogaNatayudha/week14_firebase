@@ -1,102 +1,109 @@
 package com.example.week14_firebase
 
+import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.MutableLiveData
+import com.example.week14_firebase.MainActivity.Companion.DESKRIPSI
+import com.example.week14_firebase.MainActivity.Companion.ID
+import com.example.week14_firebase.MainActivity.Companion.NAMA
+import com.example.week14_firebase.MainActivity.Companion.TANGGAL
 import com.example.week14_firebase.databinding.TambahDataBinding
 import com.google.firebase.firestore.FirebaseFirestore
 
+
 class TambahData : AppCompatActivity() {
+    private var idFeedback = ""
     private val firestore = FirebaseFirestore.getInstance()
-    private val budgetCollectionRef = firestore.collection("budgets")
+    private val budgetCollectionRef = firestore.collection("tes")
     private lateinit var binding: TambahDataBinding
-    private var updateId = ""
-    private val budgetListLiveData: MutableLiveData<List<Budget>> by lazy {
-        MutableLiveData<List<Budget>>()
-    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = TambahDataBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        with(binding) {
-            val updateBudgetId = intent.getStringExtra("UPDATE_BUDGET_ID")
-            if (updateBudgetId != null && updateBudgetId.isNotEmpty()) {
-                updateId = updateBudgetId
-                getBudgetById(updateBudgetId)
+        idFeedback = intent.getStringExtra(ID) ?: ""
+        val nama = intent.getStringExtra(NAMA)
+        val deskripsi = intent.getStringExtra(DESKRIPSI)
+        val tanggal = intent.getStringExtra(TANGGAL)
+
+        // Kemudian, gunakan data yang diterima untuk mengisi EditText atau di tempat lainnya
+        binding.edtNama.setText(nama)
+        binding.edtDesc.setText(deskripsi)
+        binding.edtDate.setText(tanggal)
+
+        binding.btnAdd.setOnClickListener {
+            onUpdateClicked() // Panggil fungsi onUpdateClicked saat tombol diklik
+        }
+
+        binding.btnAdd.setOnClickListener {
+            val nama = binding.edtNama.text.toString()
+            val deskprsi = binding.edtDesc.text.toString()
+            val tanggal = binding.edtDate.text.toString()
+            val newBudget = Detail(nama = nama, description = deskprsi,
+                date = tanggal)
+            if (idFeedback.isNotEmpty()) {
+                newBudget.id = idFeedback
+                updateFeedback(newBudget)
             } else {
-                setEmptyField()
-                btnAdd.text = "Tambah Data"
-            }
-
-            btnAdd.setOnClickListener {
-                val nominal = edtNominal.text.toString()
-                val description = edtDesc.text.toString()
-                val date = edtDate.text.toString()
-                val newBudget = Budget(nominal = nominal, description = description, date = date)
-                addOrUpdateBudget(newBudget)
-                finish()
+                addBudget(newBudget)
             }
         }
     }
 
-    private fun getBudgetById(budgetId: String) {
-        budgetCollectionRef.document(budgetId)
-            .get()
-            .addOnSuccessListener { documentSnapshot ->
-                if (documentSnapshot.exists()) {
-                    val budget = documentSnapshot.toObject(Budget::class.java)
-                    if (budget != null) {
-                        binding.edtNominal.setText(budget.nominal)
-                        binding.edtDesc.setText(budget.description)
-                        binding.edtDate.setText(budget.date)
-                        binding.btnAdd.text = "Update Data"
-                    }
-                }
+    private fun updateFeedback(feedback: Detail) {
+        feedback.id = idFeedback
+        budgetCollectionRef.document(idFeedback)
+            .set(feedback)
+            .addOnSuccessListener {
+                Log.d("SecondActivity", "Successfully Updating Feedback")
+                navigateToMainActivity()
             }
             .addOnFailureListener {
-                Log.d("AddDataActivity", "Error getting budget by ID: ", it)
+                Log.d("MainActivity", "Error updating feedback: ", it)
             }
     }
 
-    private fun addOrUpdateBudget(budget: Budget) {
-        if (updateId.isEmpty()) {
-            addBudget(budget)
-        } else {
-            updateBudget(budget)
-        }
-    }
-
-    private fun addBudget(budget: Budget) {
-        budgetCollectionRef.add(budget)
+    private fun addBudget(feedback: Detail) {
+        budgetCollectionRef.add(feedback)
             .addOnSuccessListener { documentReference ->
-                val createdBudgetId = documentReference.id
-                budget.id = createdBudgetId
-                documentReference.set(budget)
+                val createdFeedbackId = documentReference.id
+                feedback.id = createdFeedbackId
+                documentReference.set(feedback)
+                    .addOnSuccessListener {
+                        Log.d("SecondActivity", "Successfully Adding Feedback")
+                        navigateToMainActivity()
+                    }
                     .addOnFailureListener {
-                        Log.d("AddDataActivity", "Error updating budget ID: ", it)
+                        Log.d("MainActivity", "Error adding feedback ID: ", it)
                     }
             }
             .addOnFailureListener {
-                Log.d("AddDataActivity", "Error adding budget: ", it)
+                Log.d("MainActivity", "Error adding feedback: ", it)
             }
     }
 
-    private fun updateBudget(budget: Budget) {
-        budget.id = updateId
-        budgetCollectionRef.document(updateId).set(budget)
-            .addOnFailureListener {
-                Log.d("AddDataActivity", "Error updating budget: ", it)
-            }
-    }
+    private fun onUpdateClicked() {
+        val nama = binding.edtNama.text.toString()
+        val deskripsi = binding.edtDesc.text.toString()
+        val tanggal = binding.edtDate.text.toString()
+        val updateFeedback = Detail(nama = nama, description = deskripsi,
+            date = tanggal)
 
-    private fun setEmptyField() {
-        with(binding) {
-            edtNominal.setText("")
-            edtDesc.setText("")
-            edtDate.setText("")
+        if (idFeedback.isNotEmpty()) {
+            updateFeedback.id = idFeedback
+            updateFeedback(updateFeedback)
+        } else {
+            addBudget(updateFeedback)
         }
     }
+
+    private fun navigateToMainActivity() {
+        val intent = Intent(this, MainActivity::class.java)
+        startActivity(intent)
+        finish()
+    }
+
 }

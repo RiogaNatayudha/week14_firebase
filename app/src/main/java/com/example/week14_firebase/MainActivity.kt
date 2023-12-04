@@ -1,115 +1,148 @@
 package com.example.week14_firebase
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.util.Log
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import android.widget.AdapterView
 import android.widget.ArrayAdapter
+import android.widget.ImageButton
+import android.widget.TextView
 import androidx.lifecycle.MutableLiveData
+import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.RecyclerView
 import com.google.firebase.firestore.FirebaseFirestore
 import com.example.week14_firebase.databinding.ActivityMainBinding
 
 
 class MainActivity : AppCompatActivity() {
     private val firestore = FirebaseFirestore.getInstance()
-    private val budgetCollectionRef = firestore.collection("budgets")
+    private val budgetCollectionRef = firestore.collection("tes")
     private lateinit var binding: ActivityMainBinding
-    private var updateId = ""
-    private val budgetListLiveData: MutableLiveData<List<Budget>> by lazy {
-        MutableLiveData<List<Budget>>()
+    private val detailListLiveData: MutableLiveData<List<Detail>> by lazy {
+        MutableLiveData<List<Detail>>()
     }
-    private val ADD_DATA_REQUEST_CODE = 1
-
+    companion object {
+        const val ID = "id"
+        const val NAMA = "nama"
+        const val DESKRIPSI = "deskripsi"
+        const val TANGGAL = "tanggal"
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        with(binding) {
-            btnGoToMain.setOnClickListener {
-                val intent = Intent(this@MainActivity, TambahData::class.java)
-                startActivityForResult(intent, ADD_DATA_REQUEST_CODE)
-            }
-
-            listView.onItemClickListener = AdapterView.OnItemClickListener { _, _, position, _ ->
-                val item = listView.adapter.getItem(position) as Budget
-                updateId = item.id
-                val intent = Intent(this@MainActivity, TambahData::class.java)
-                intent.putExtra("UPDATE_BUDGET_ID", updateId)
-                startActivityForResult(intent, ADD_DATA_REQUEST_CODE)
-            }
-
-            listView.onItemLongClickListener = AdapterView.OnItemLongClickListener { _, _, position, _ ->
-                val item = listView.adapter.getItem(position) as Budget
-                deleteBudget(item)
-                true
-            }
+        binding.btnGoToMain.setOnClickListener {
+            val intent = Intent(this, TambahData::class.java)
+            startActivity(intent)
         }
-        observeBudgets()
-        getAllBudgets()
+
+        observeDetail()
+        getAllDetail()
     }
 
-    private fun getAllBudgets() {
-        observeBudgetChanges()
+    private fun getAllDetail() {
+        observeDetailChanges()
     }
 
-    private fun observeBudgets() {
-        budgetListLiveData.observe(this) { budgets ->
-            val adapter = ArrayAdapter(
-                this,
-                android.R.layout.simple_list_item_1,
-                budgets.toMutableList()
-            )
-            binding.listView.adapter = adapter
+    private fun observeDetail() {
+        detailListLiveData.observe(this) { datadetail ->
+            val adapterFeed = DetailAdapter(this, datadetail)
+            binding.listView.apply {
+                adapter = adapterFeed
+                layoutManager = LinearLayoutManager(this@MainActivity)
+                setHasFixedSize(true)
+            }
         }
     }
 
-    private fun observeBudgetChanges() {
+    private fun observeDetailChanges() {
         budgetCollectionRef.addSnapshotListener { snapshots, error ->
             if (error != null) {
-                Log.d("MainActivity", "Error listening for budget changes: ", error)
+                Log.d("MainActivity", "Error: ", error)
                 return@addSnapshotListener
             }
-            val budgets = snapshots?.toObjects(Budget::class.java)
-            if (budgets != null) {
-                budgetListLiveData.postValue(budgets)
+            val detail = snapshots?.toObjects(Detail::class.java)
+            if (detail != null) {
+                detailListLiveData.postValue(detail)
             }
         }
     }
 
-    private fun addBudget(budget: Budget) {
-        budgetCollectionRef.add(budget)
-            .addOnSuccessListener { documentReference ->
-                val createdBudgetId = documentReference.id
-                budget.id = createdBudgetId
-                documentReference.set(budget)
-                    .addOnFailureListener {
-                        Log.d("MainActivity", "Error updating budget ID: ", it)
-                    }
+    inner class DetailAdapter(
+        private val context: Context,
+        private val detailList: List<Detail>
+    ) : RecyclerView.Adapter<DetailAdapter.ViewHolder>() {
+
+        override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ViewHolder {
+            val itemView = LayoutInflater.from(context).inflate(R.layout.datadetail, parent, false)
+            return ViewHolder(itemView)
+        }
+
+        override fun onBindViewHolder(holder: ViewHolder, position: Int) {
+            val detail = detailList[position]
+            holder.bind(detail)
+        }
+
+        override fun getItemCount(): Int {
+            return detailList.size
+        }
+
+        inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
+            private val namaTextView: TextView = itemView.findViewById(R.id.namaDetail)
+            private val deskripsiTextView: TextView = itemView.findViewById(R.id.descDetail)
+            private val tanggalTextView: TextView = itemView.findViewById(R.id.tgl)
+            private val btnDelete: ImageButton = itemView.findViewById(R.id.btn_delete)
+
+            fun bind(feedback: Detail) {
+                // Bind the data to the views
+                namaTextView.text = feedback.nama
+                deskripsiTextView.text = feedback.description
+                tanggalTextView.text = feedback.date
+
+                // Set click listener for item click
+                itemView.setOnClickListener {
+                    val intent = Intent(context, TambahData::class.java)
+                    intent.putExtra(ID, feedback.id)
+                    intent.putExtra(NAMA, feedback.nama)
+                    intent.putExtra(DESKRIPSI, feedback.description)
+                    intent.putExtra(TANGGAL, feedback.date)
+                    context.startActivity(intent)
+                }
+
+                // Set long click listener for item long click
+                itemView.setOnLongClickListener {
+                    deleteBudget(feedback)
+                    true // Indicate that the long click event is handled
+                }
+
+                // Set click listener for delete button
+                btnDelete.setOnClickListener {
+                    // Handle delete button click
+                    deleteBudget(feedback)
+                }
             }
-            .addOnFailureListener {
-                Log.d("MainActivity", "Error adding budget: ", it)
-            }
+        }
     }
 
-    private fun updateBudget(budget: Budget) {
-        budget.id = updateId
-        budgetCollectionRef.document(updateId).set(budget)
-            .addOnFailureListener {
-                Log.d("MainActivity", "Error updating budget: ", it)
-            }
-    }
-
-    private fun deleteBudget(budget: Budget) {
-        if (budget.id.isEmpty()) {
-            Log.d("MainActivity", "Error deleting: budget ID is empty!")
+    private fun deleteBudget(feedback: Detail) {
+        if (feedback.id.isEmpty()) {
+            Log.d("MainActivity", "Error deleting: feedback ID is empty!")
             return
         }
-        budgetCollectionRef.document(budget.id).delete()
+        budgetCollectionRef.document(feedback.id)
+            .delete()
+            .addOnSuccessListener {
+                Log.d("MainActivity", "Successfully Deleting Feedback")
+            }
             .addOnFailureListener {
-                Log.d("MainActivity", "Error deleting budget: ", it)
+                Log.d("MainActivity", "Error deleting feedback: ", it)
             }
     }
 }
